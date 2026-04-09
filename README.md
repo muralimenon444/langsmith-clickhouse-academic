@@ -1,284 +1,390 @@
-# ClickHouse + LangChain + LangSmith Integration
+# 🏥 LangGraph Clinical Data Agent
 
-An academic project demonstrating real-time AI observability by integrating **LangChain** with **ClickHouse** for high-performance logging and **LangSmith** for distributed tracing.
+> **Production-ready clinical data analysis agent powered by LangGraph, Databricks Foundation Models, and Unity Catalog**
+
+[![LangGraph](https://img.shields.io/badge/LangGraph-State%20Machine-blue)](https://github.com/langchain-ai/langgraph)
+[![Databricks](https://img.shields.io/badge/Databricks-Production-orange)](https://databricks.com)
+[![Python](https://img.shields.io/badge/Python-3.11+-green)](https://python.org)
+[![LangSmith](https://img.shields.io/badge/LangSmith-Tracing-purple)](https://smith.langchain.com)
 
 ## 📋 Overview
 
-This notebook showcases a production-ready pattern for:
-- **AI Application Logging**: Store LangChain interactions in ClickHouse for fast analytics
-- **Distributed Tracing**: Automatic trace capture with LangSmith
-- **Performance Analytics**: Query and analyze AI response metrics
-- **Academic Research**: Foundation for studying LLM application behavior at scale
+A production-grade agentic system that translates natural language questions into validated SQL queries, executes them against clinical data tables, and generates professional healthcare insights. Built with **deterministic safety guardrails**, **distributed tracing**, and **graceful error handling** for enterprise deployment.
 
-## 🎯 Features
+### Key Capabilities
 
-- ✅ **ClickHouse Integration**: High-performance columnar database for AI logs
-- ✅ **LangSmith Tracing**: Automatic observability for LangChain applications
-- ✅ **Modern LangChain**: Uses LCEL (LangChain Expression Language) syntax
-- ✅ **Analytics Built-in**: Response size tracking, aggregations, and statistics
-- ✅ **Production-Ready**: Environment variable management, error handling
+- 🧠 **Natural Language to SQL**: Meta Llama 3.3 70B converts clinical questions to optimized Spark SQL
+- 🛡️ **Safety-First Architecture**: Deterministic validation blocks all destructive SQL operations
+- ⚡ **Production-Ready Execution**: Databricks SQL Warehouse integration with configurable timeout
+- 📊 **Clinical Insights**: LLM-powered summarization with operational recommendations
+- 🔍 **Full Observability**: LangSmith distributed tracing + ClickHouse logging (best-effort)
+- 🔐 **Secure by Design**: Databricks Secrets for all credentials, no hardcoded keys
+
+---
+
+## 🏗️ Architecture
+
+### 5-Node LangGraph State Machine
+
+```
+┌─────────────┐
+│ User Query  │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────────┐
+│  Analyst Node   │  Generate SQL from natural language
+│  (Meta Llama)   │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Validator Node  │  Deterministic safety checks
+│ (Rule-based)    │
+└────────┬────────┘
+         │
+         ▼
+    ┌────────┐
+    │ Router │  Safe SQL?
+    └───┬────┘
+        │
+    ┌───┴───┐
+    │       │
+    ▼       ▼
+ ┌─────┐  ┌────┐
+ │ END │  │ OK │
+ └─────┘  └──┬─┘
+             │
+             ▼
+    ┌─────────────────┐
+    │ Executor Node   │  Run SQL on warehouse
+    │ (SQL API)       │
+    └────────┬────────┘
+             │
+             ▼
+    ┌─────────────────┐
+    │ Summarizer Node │  Generate clinical insights
+    │ (Meta Llama)    │
+    └────────┬────────┘
+             │
+             ▼
+      ┌──────────────┐
+      │ Final Answer │
+      └──────────────┘
+```
+
+### Node Responsibilities
+
+| Node | Purpose | Technology | Output |
+|------|---------|------------|--------|
+| **Analyst** | Natural language → SQL | Meta Llama 3.3 70B | Spark SQL query |
+| **Validator** | Safety checks | Deterministic rules | Boolean (safe/unsafe) |
+| **Router** | Conditional branching | LangGraph | Route decision |
+| **Executor** | SQL execution | Databricks SQL API | Query results |
+| **Summarizer** | Insight generation | Meta Llama 3.3 70B | Clinical summary |
+
+---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-1. **ClickHouse Cloud Account** (or self-hosted ClickHouse instance)
-   - Sign up at [clickhouse.cloud](https://clickhouse.cloud)
-   - Note your host URL and password
-
-2. **LangSmith Account**
-   - Sign up at [smith.langchain.com](https://smith.langchain.com)
-   - Get your API key from Settings
-
-3. **Databricks Workspace** (or local Python environment)
-   - Python 3.12+
-   - Access to install packages
+- **Databricks Workspace** (Serverless or All-Purpose Cluster)
+- **Unity Catalog** with clinical data tables
+- **LangSmith Account** (for tracing)
+- **ClickHouse Cloud** (optional, for additional logging)
 
 ### Installation
 
-1. **Clone or import the notebook** to your Databricks workspace
+1. **Clone the repository**
+   ```bash
+   git clone <your-repo-url>
+   cd langchain-production-agent
+   ```
 
-2. **Create a `.env` file** in your workspace with the following variables:
+2. **Install dependencies** (in notebook Cell 2)
+   ```python
+   %pip install --upgrade numpy<2.0 langgraph langsmith clickhouse-connect --quiet
+   dbutils.library.restartPython()
+   ```
 
-```env
-CH_HOST=your-clickhouse-host.clickhouse.cloud
-CH_PASSWORD=your-clickhouse-password
-LANGCHAIN_API_KEY=your-langsmith-api-key
-```
+3. **Configure Databricks Secrets**
+   ```python
+   from databricks.sdk import WorkspaceClient
+   w = WorkspaceClient()
+   
+   # LangSmith API Key
+   w.secrets.create_scope(scope="langsmith", initial_manage_principal="users")
+   w.secrets.put_secret(scope="langsmith", key="api_key", string_value="lsv2_pt_...")
+   
+   # ClickHouse credentials (optional)
+   w.secrets.create_scope(scope="clickhouse", initial_manage_principal="users")
+   w.secrets.put_secret(scope="clickhouse", key="host", string_value="xyz.clickhouse.cloud")
+   w.secrets.put_secret(scope="clickhouse", key="password", string_value="...")
+   w.secrets.put_secret(scope="clickhouse", key="port", string_value="8443")
+   w.secrets.put_secret(scope="clickhouse", key="user", string_value="default")
+   ```
 
-3. **Run the notebook cells in order** (Cells 1-7)
-
-## 📦 Dependencies
-
-All dependencies are installed automatically in Cell 1:
-
-```bash
-pip install clickhouse-connect langchain langchain-community langchain-openai python-dotenv
-```
-
-## 🏗️ Architecture
-
-```
-┌─────────────────┐
-│  LangChain App  │
-│   (Cell 6)      │
-└────────┬────────┘
-         │
-         ├─────────────────┐
-         │                 │
-         ▼                 ▼
-┌─────────────────┐ ┌──────────────┐
-│   ClickHouse    │ │  LangSmith   │
-│  (Data Store)   │ │   (Tracing)  │
-└─────────────────┘ └──────────────┘
-         │
-         ▼
-┌─────────────────┐
-│   Analytics     │
-│    (Cell 7)     │
-└─────────────────┘
-```
-
-## 📓 Notebook Structure
-
-| Cell | Title | Purpose |
-|------|-------|----------|
-| 1 | Install Dependencies | Install required Python packages |
-| 2 | Restart Python | Apply installed packages |
-| 3 | Connect to ClickHouse | Establish database connection |
-| 4 | Configure LangSmith Tracing | Enable observability |
-| 5 | Create ClickHouse Table | Set up `ai_logs` schema |
-| 6 | Run LangChain Chain | Execute AI chain & log to ClickHouse |
-| 7 | Query and Display AI Logs | View results with analytics |
-
-## 💾 Database Schema
-
-The `ai_logs` table structure:
-
-```sql
-CREATE TABLE ai_logs (
-    event_time DateTime DEFAULT now(),
-    prompt String,
-    response String,
-    tokens_used UInt32
-) ENGINE = MergeTree()
-ORDER BY event_time
-```
-
-## 🔍 Usage Examples
-
-### Basic Chain Execution (Cell 6)
-
-```python
-from langchain_community.llms.fake import FakeListLLM
-from langchain_core.prompts import PromptTemplate
-
-# Create chain
-prompt = PromptTemplate(
-    input_variables=["topic"],
-    template="Tell me something about {topic}."
-)
-llm = FakeListLLM(responses=["Response 1", "Response 2"])
-chain = prompt | llm
-
-# Execute and log
-result = chain.invoke({"topic": "Your Topic"})
-```
-
-### Query Analytics (Cell 7)
-
-```python
-query = """
-SELECT 
-    event_time,
-    prompt, 
-    length(response) AS response_size
-FROM ai_logs 
-ORDER BY event_time DESC
-"""
-results = client.query(query)
-```
-
-## 🛠️ Customization
-
-### Switch to Real LLM
-
-Replace the `FakeListLLM` in Cell 6 with a real model:
-
-```python
-from langchain_openai import ChatOpenAI
-
-llm = ChatOpenAI(
-    model="gpt-4",
-    temperature=0.7,
-    openai_api_key=os.getenv('OPENAI_API_KEY')
-)
-```
-
-### Add More Fields to Logs
-
-Modify the table schema in Cell 5:
-
-```sql
-ALTER TABLE ai_logs ADD COLUMN model_name String;
-ALTER TABLE ai_logs ADD COLUMN latency_ms UInt32;
-```
-
-### Change LangSmith Project
-
-Update Cell 4:
-
-```python
-os.environ["LANGCHAIN_PROJECT"] = "Your-Project-Name"
-```
-
-## 📊 Analytics Queries
-
-### Average Response Length by Hour
-
-```sql
-SELECT 
-    toStartOfHour(event_time) AS hour,
-    AVG(length(response)) AS avg_length
-FROM ai_logs
-GROUP BY hour
-ORDER BY hour DESC
-```
-
-### Most Common Prompts
-
-```sql
-SELECT 
-    prompt,
-    COUNT(*) AS count
-FROM ai_logs
-GROUP BY prompt
-ORDER BY count DESC
-LIMIT 10
-```
-
-### Token Usage Statistics
-
-```sql
-SELECT 
-    SUM(tokens_used) AS total_tokens,
-    AVG(tokens_used) AS avg_tokens,
-    MAX(tokens_used) AS max_tokens
-FROM ai_logs
-```
-
-## 🔒 Security Notes
-
-- **Never commit `.env` files** to version control
-- Use Databricks Secrets for production deployments
-- Restrict ClickHouse user permissions to minimum required
-- Rotate API keys regularly
-
-## 🐛 Troubleshooting
-
-### Connection Failed
-
-**Problem**: `❌ Connection failed. Did you create the .env file?`
-
-**Solution**: 
-- Verify `.env` file exists in the notebook directory
-- Check `CH_HOST` and `CH_PASSWORD` are correct
-- Ensure ClickHouse instance is running and accessible
-
-### Module Not Found
-
-**Problem**: `ModuleNotFoundError: No module named 'clickhouse_connect'`
-
-**Solution**:
-- Run Cell 1 to install dependencies
-- Run Cell 2 to restart Python
-- Re-run subsequent cells
-
-### LangSmith Not Tracing
-
-**Problem**: Traces not appearing in LangSmith dashboard
-
-**Solution**:
-- Verify `LANGCHAIN_API_KEY` is set correctly
-- Check project name in Cell 4
-- Wait 5-10 seconds for traces to appear
-- Refresh the LangSmith dashboard
-
-## 📚 Additional Resources
-
-- [ClickHouse Documentation](https://clickhouse.com/docs)
-- [LangChain Documentation](https://python.langchain.com/docs/get_started/introduction)
-- [LangSmith Documentation](https://docs.smith.langchain.com/)
-- [LangChain Expression Language (LCEL)](https://python.langchain.com/docs/expression_language/)
-
-## 🤝 Contributing
-
-This is an academic project. Contributions welcome:
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
-
-## 📄 License
-
-MIT License - feel free to use this for academic or commercial projects.
-
-## 👤 Author
-
-Murali Menon  
-Academic Research Project  
-[GitHub Repository](https://github.com/muralimenon444/langsmith-clickhouse-academic)
-
-## 🙏 Acknowledgments
-
-- ClickHouse team for the incredible database
-- LangChain team for the AI framework
-- LangSmith team for observability tools
-- Databricks for the development platform
+4. **Run the main notebook**  
+   Open `agent_logic/01_langgraph_state_machine.ipynb` and run cells 3-12
 
 ---
 
-**Last Updated**: April 2026  
-**Version**: 1.0.0  
-**Status**: Production Ready ✅
+## 💻 Usage
+
+### Basic Query Execution
+
+```python
+# Initialize agent (cells 3-9)
+app = workflow.compile()
+
+# Execute a clinical query
+result = app.invoke({
+    "user_query": "How many unique patients had inpatient encounters in 2023?"
+})
+
+print(result["final_answer"])  # Clinical insights
+```
+
+### Example Queries
+
+```python
+# Patient demographics
+"What is the average age of patients with diabetes?"
+
+# Encounter analysis
+"Compare inpatient admissions between Q3 and Q4 2024"
+
+# Trend analysis
+"Show monthly emergency room visits for the past 6 months"
+
+# Complex joins
+"What percentage of patients over 65 had wellness encounters?"
+```
+
+### Safety Validation in Action
+
+```python
+# ✅ SAFE - SELECT only
+app.invoke({"user_query": "Show me all encounters from 2024"})
+# Result: Query executes successfully
+
+# ❌ UNSAFE - Blocked by validator
+app.invoke({"user_query": "Delete all records from patient_registry"})
+# Result: Workflow stops at validator, no execution
+```
+
+---
+
+## 📁 Project Structure
+
+```
+langchain-production-agent/
+├── agent_logic/
+│   └── 01_langgraph_state_machine.ipynb   # Main agent workflow
+├── observability/
+│   └── 01_clickhouse_trace_logger.ipynb   # ClickHouse logging
+├── utils/
+│   └── 01_Clickhouse_Connection_Test.ipynb # Connection utilities
+├── Add_Secret.ipynb                        # Secret management
+└── README.md                               # This file
+```
+
+### Key Notebooks
+
+#### `agent_logic/01_langgraph_state_machine.ipynb`
+Core agent implementation with all 5 nodes:
+- **Cell 3**: LangSmith configuration
+- **Cell 4**: AgentState definition
+- **Cell 5**: Analyst node (SQL generation)
+- **Cell 6**: Validator node (safety checks)
+- **Cell 7**: Router function
+- **Cell 9**: Executor & Summarizer nodes
+- **Cell 12**: Production test with dual observability
+
+---
+
+## 🔍 Observability
+
+### Primary: LangSmith Distributed Tracing
+
+**Status**: ✅ Fully Operational
+
+LangSmith provides complete visibility into agent execution:
+
+- **Node-level tracing**: See timing and outputs for each node
+- **LLM call monitoring**: Track prompts, responses, and token usage
+- **State transitions**: Visualize workflow routing decisions
+- **Error debugging**: Inspect failures with full stack traces
+
+**Access your traces**:  
+👉 [https://smith.langchain.com](https://smith.langchain.com)
+
+### Secondary: ClickHouse Logging (Best-Effort)
+
+**Status**: ⚠️ Graceful Degradation on Serverless
+
+ClickHouse logging captures:
+- User queries
+- Generated SQL
+- Safety validation results
+- Execution latency (ms)
+- Final answers
+
+**Known Limitation**:  
+NumPy binary incompatibility on Databricks serverless clusters causes ClickHouse logging to fail gracefully. The agent continues working perfectly—LangSmith provides full observability.
+
+---
+
+## 🔐 Security
+
+### Credential Management
+
+**All secrets stored in Databricks Secrets**:
+- ✅ LangSmith API key: `langsmith.api_key`
+- ✅ ClickHouse host: `clickhouse.host`
+- ✅ ClickHouse password: `clickhouse.password`
+- ✅ ClickHouse port: `clickhouse.port`
+- ✅ ClickHouse user: `clickhouse.user`
+
+**Zero hardcoded credentials** in notebooks or code.
+
+### SQL Safety Guardrails
+
+**Deterministic validation blocks**:
+- `DROP` - Prevents table deletion
+- `DELETE` - Prevents data deletion
+- `UPDATE` - Prevents data modification
+- `INSERT` - Prevents data insertion
+- `ALTER` - Prevents schema changes
+- `TRUNCATE` - Prevents data removal
+- `MERGE` - Prevents upsert operations
+
+**Only `SELECT` queries are allowed**.
+
+---
+
+## 🎯 Production Deployment
+
+### Readiness Checklist
+
+- ✅ No hardcoded credentials
+- ✅ Full LangSmith observability
+- ✅ Deterministic safety validation
+- ✅ Error handling in all nodes
+- ✅ SQL execution via warehouse API
+- ✅ Clinical insight generation
+- ✅ Graceful degradation (ClickHouse)
+- ✅ Safe for version control
+
+### Performance Metrics (Typical)
+
+| Metric | Value |
+|--------|-------|
+| **End-to-end latency** | 4-30 seconds |
+| **SQL generation** | 1-2 seconds |
+| **Validation** | < 100ms (deterministic) |
+| **Execution** | 2-25 seconds (depends on query) |
+| **Summarization** | 1-3 seconds |
+
+---
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+#### 1. "numpy.dtype size changed" error
+
+**Symptom**: ClickHouse logging fails with binary incompatibility error  
+**Impact**: Non-blocking, agent continues working  
+**Solution**: Accept graceful degradation (LangSmith provides full observability)
+
+```python
+# This is expected behavior on serverless
+⚠️  ClickHouse logging skipped (known serverless limitation)
+```
+
+#### 2. SQL execution timeout
+
+**Symptom**: Query stays in `PENDING` state  
+**Solution**: Increase timeout in executor node (Cell 9)
+
+```python
+statement = w.statement_execution.execute_statement(
+    warehouse_id="your-warehouse-id",
+    statement=sql,
+    wait_timeout="60s"  # Increase from 30s
+)
+```
+
+#### 3. "Secret not found" error
+
+**Symptom**: `dbutils.secrets.get()` fails  
+**Solution**: Verify secret scope and key exist
+
+```python
+# List all scopes
+w.secrets.list_scopes()
+
+# List keys in scope
+w.secrets.list_secrets(scope="langsmith")
+```
+
+---
+
+## 📊 Data Schema
+
+### Expected Tables (Unity Catalog)
+
+#### `clinical_dev.analytics_agent.clinical_encounters`
+| Column | Type | Description |
+|--------|------|-------------|
+| `PATIENT` | STRING | Patient identifier |
+| `ENCOUNTERCLASS` | STRING | Type of encounter (Inpatient, Outpatient, etc.) |
+| `START` | TIMESTAMP | Encounter start time |
+| `STOP` | TIMESTAMP | Encounter end time |
+
+#### `clinical_dev.analytics_agent.patient_registry`
+| Column | Type | Description |
+|--------|------|-------------|
+| `PATIENT` | STRING | Patient identifier |
+| `BIRTHDATE` | DATE | Date of birth |
+| `GENDER` | STRING | Patient gender |
+| `RACE` | STRING | Patient race |
+| `ETHNICITY` | STRING | Patient ethnicity |
+
+---
+
+## 📊 Data Engineering & Compliance
+
+- **Source:** 100% Synthetic Clinical Dataset
+- **Generation:** Custom Python pipeline using NumPy/Pandas to simulate realistic patient behavior
+- **Scale:** 5,000 encounters across 1,000 unique patients
+- **Compliance:** Built using a "Privacy-by-Design" approach to ensure zero Protected Health Information (PHI) was used during development
+
+---
+
+## 📚 Resources
+
+- [LangGraph Documentation](https://langchain-ai.github.io/langgraph/)
+- [Databricks Foundation Models](https://docs.databricks.com/machine-learning/foundation-models/index.html)
+- [LangSmith Documentation](https://docs.smith.langchain.com/)
+- [Unity Catalog](https://docs.databricks.com/data-governance/unity-catalog/index.html)
+
+---
+
+## 👤 Author
+
+**Murali Menon**  
+muralimenon444@gmail.com
+
+**Built with**: Databricks, LangGraph, LangChain, Meta Llama 3.3 70B, ClickHouse
+
+---
+
+## 🙏 Acknowledgments
+
+- **LangChain**: State machine framework (LangGraph)
+- **Databricks**: Foundation models and Unity Catalog
+- **Meta**: Llama 3.3 70B Instruct
+- **ClickHouse**: Time-series logging infrastructure
